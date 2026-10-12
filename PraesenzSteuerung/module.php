@@ -8,26 +8,23 @@ class PraesenzSteuerung extends IPSModule {
         $this->RegisterPropertyString("Targets", "[]");
         $this->RegisterPropertyInteger("DelayTime", 60);
         
-        // Timer für den Nachlauf
         $this->RegisterTimer("OffTimer", 0, 'IPS_RequestAction($_IPS["TARGET"], "OffTimer", "");');
         
-        // Interne Zustände
         $this->SetBuffer("ExpectedState", "0");
         $this->SetBuffer("ManualOverride", "NONE");
         $this->SetBuffer("LastPresenceState", "0");
+        $this->SetBuffer("LastActionTime", "0");
     }
 
     public function ApplyChanges() {
         parent::ApplyChanges();
         
-        // Alle alten Events löschen, um doppelte Trigger zu vermeiden
         foreach ($this->GetMessageList() as $senderID => $messages) {
             foreach ($messages as $message) {
                 $this->UnregisterMessage($senderID, $message);
             }
         }
         
-        // Präsenzmelder abonnieren
         $sensors = json_decode($this->ReadPropertyString("PresenceSensors"), true);
         if (is_array($sensors)) {
             foreach ($sensors as $sensor) {
@@ -37,7 +34,6 @@ class PraesenzSteuerung extends IPSModule {
             }
         }
         
-        // Ziel-Geräte abonnieren (für die Erkennung der manuellen Schaltung)
         $targets = json_decode($this->ReadPropertyString("Targets"), true);
         if (is_array($targets)) {
             foreach ($targets as $target) {
@@ -78,8 +74,8 @@ class PraesenzSteuerung extends IPSModule {
         }
         
         if ($isTarget) {
-            // $Data[0] enthält bei VM_UPDATE den neuen Wert
-            $this->EvaluateTarget($SenderID, $Data[0]);
+            // $Data[0] ist der neue Wert, $Data[1] gibt an, ob sich der Wert geändert hat
+            $this->EvaluateTarget($SenderID, $Data[0], $Data[1]);
         }
     }
 
@@ -87,7 +83,6 @@ class PraesenzSteuerung extends IPSModule {
         $sensors = json_decode($this->ReadPropertyString("PresenceSensors"), true);
         $overallPresence = false;
         
-        // ODER-Verknüpfung aller Sensoren
         if (is_array($sensors)) {
             foreach ($sensors as $sensor) {
                 if (IPS_VariableExists($sensor['VariableID'])) {
@@ -104,18 +99,23 @@ class PraesenzSteuerung extends IPSModule {
         $manualOverride = $this->GetBuffer("ManualOverride");
         
         if ($overallPresence && !$lastPresence) {
-            // Steigende Flanke (Präsenz erkannt)
-            $this->SetBuffer("ManualOverride", "NONE"); 
-            $this->SetTimerInterval("OffTimer", 0);
-            $this->SetBuffer("ExpectedState", "1");
-            $this->SwitchTargets(true);
+            // Präsenz erkannt (steigende Flanke)
+            if ($manualOverride != "ON") {
+                $this->SetBuffer("ManualOverride", "NONE"); 
+                $this->SetTimerInterval("OffTimer", 0);
+                $this->SetBuffer("ExpectedState", "1");
+                $this->SetBuffer("LastActionTime", (string)time());
+                $this->SwitchTargets(true);
+            }
             
         } elseif ($overallPresence && $lastPresence) {
             // Präsenz bleibt bestehen
-            $this->SetTimerInterval("OffTimer", 0);
+            if ($manualOverride != "ON") {
+                $this->SetTimerInterval("OffTimer", 0);
+            }
             
         } elseif (!$overallPresence && $lastPresence) {
-            // Fallende Flanke (Präsenz beendet)
+            // Präsenz beendet (fallende Flanke)
             if ($manualOverride != "ON") {
                 $delay = $this->ReadPropertyInteger("DelayTime");
                 if ($delay > 0) {
@@ -127,19 +127,37 @@ class PraesenzSteuerung extends IPSModule {
         }
     }
 
-    private function EvaluateTarget($targetID, $newValue) {
+    private function EvaluateTarget($targetID, $newValue, $hasChanged) {
         $expectedState = $this->GetBuffer("ExpectedState") === "1";
         $boolNewValue = (bool)$newValue;
+        $lastAction = (int)$this->GetBuffer("LastActionTime");
         
+        // Fall 1: Physikalischer Wechsel entgegen der Automatik
         if ($boolNewValue != $expectedState) {
-            // Manuelle Änderung erkannt
             if ($boolNewValue) {
                 $this->SetBuffer("ManualOverride", "ON");
             } else {
                 $this->SetBuffer("ManualOverride", "OFF");
             }
-            // Laufenden Timer abbrechen, da manueller Eingriff Vorrang hat
             $this->SetTimerInterval("OffTimer", 0);
+            
+            // WICHTIG: Erwartung anpassen, damit Folgeschaltungen korrekt erkannt werden
+            $this->SetBuffer("ExpectedState", $boolNewValue ? "1" : "0");
+        } 
+        // Fall 2: Der Schalter wurde erneut auf "AN" gedrückt, obwohl er schon "AN" war
+        else if (!$hasChanged && $boolNewValue === true && $expectedState === true) {
+            // Zeit prüfen, um Echos der Skript-eigenen Schaltung zu ignorieren (3 Sekunden Puffer)
+            if (time() - $lastAction > 3) {
+                // Hinweis für Shelly-Nutzer: Falls ein Gerät zyklisch seinen Status sendet,
+                // kann dies als Tastendruck gewertet werden. In dem Fall das Licht kurz Aus und wieder An schalten.
+                $this->SetBuffer("ManualOverride", "ON");
+                $this->SetTimerInterval("OffTimer", 0);
+            }
+        }
+        
+        // Override aufheben, wenn manuell ausgeschaltet wurde und der Raum leer ist
+        if (!$boolNewValue && $this->GetBuffer("ManualOverride") == "OFF" && $this->GetBuffer("LastPresenceState") == "0") {
+             $this->SetBuffer("ManualOverride", "NONE");
         }
     }
 
@@ -152,6 +170,8 @@ class PraesenzSteuerung extends IPSModule {
     private function TriggerOff() {
         $this->SetTimerInterval("OffTimer", 0);
         $this->SetBuffer("ExpectedState", "0");
+        $this->SetBuffer("ManualOverride", "NONE");
+        $this->SetBuffer("LastActionTime", (string)time());
         $this->SwitchTargets(false);
     }
 
