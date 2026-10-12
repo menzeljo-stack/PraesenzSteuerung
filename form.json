@@ -1,0 +1,64 @@
+{
+    "elements": [
+        {
+            "type": "List",
+            "name": "PresenceSensors",
+            "caption": "Präsenzmelder (Bool-Variablen)",
+            "add": true,
+            "delete": true,
+            "columns": [
+                {
+                    "caption": "Bezeichnung",
+                    "name": "Name",
+                    "width": "200px",
+                    "add": "Neuer Melder",
+                    "edit": {
+                        "type": "ValidationTextBox"
+                    }
+                },
+                {
+                    "caption": "Variable",
+                    "name": "VariableID",
+                    "width": "auto",
+                    "add": 0,
+                    "edit": {
+                        "type": "SelectVariable"
+                    }
+                }
+            ]
+        },
+        {
+            "type": "List",
+            "name": "Targets",
+            "caption": "Ziel-Geräte (Status-Variablen, Bool)",
+            "add": true,
+            "delete": true,
+            "columns": [
+                {
+                    "caption": "Bezeichnung",
+                    "name": "Name",
+                    "width": "200px",
+                    "add": "Neues Gerät",
+                    "edit": {
+                        "type": "ValidationTextBox"
+                    }
+                },
+                {
+                    "caption": "Variable",
+                    "name": "VariableID",
+                    "width": "auto",
+                    "add": 0,
+                    "edit": {
+                        "type": "SelectVariable"
+                    }
+                }
+            ]
+        },
+        {
+            "type": "NumberSpinner",
+            "name": "DelayTime",
+            "caption": "Nachlaufzeit (in Sekunden)",
+            "minimum": 0
+        }
+    ]
+}

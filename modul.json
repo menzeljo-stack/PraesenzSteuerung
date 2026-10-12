@@ -1,0 +1,11 @@
+{
+    "id": "{B2C3D4E5-F6A7-8901-2345-67890ABCDEF1}",
+    "name": "Praesenz Steuerung",
+    "type": 3,
+    "vendor": "",
+    "aliases": ["Präsenz Steuerung"],
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "PRAES"
+}
