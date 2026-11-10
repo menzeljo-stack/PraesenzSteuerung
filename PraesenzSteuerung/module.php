@@ -180,10 +180,20 @@ class PraesenzSteuerung extends IPSModule {
         if (is_array($targets)) {
             foreach ($targets as $target) {
                 if (IPS_VariableExists($target['VariableID'])) {
+                    // Sperrzeit: in diesem Zeitfenster nicht automatisch einschalten (Ausschalten bleibt erlaubt)
+                    if ($state && $this->IsBlocked((int)($target['BlockFrom'] ?? 0), (int)($target['BlockTo'] ?? 0))) {
+                        continue;
+                    }
                     @RequestAction($target['VariableID'], $state);
                 }
             }
         }
+    }
+    /** true, wenn die aktuelle Uhrzeit im Sperrfenster liegt (von == bis bedeutet keine Sperre, über Mitternacht möglich) */
+    private function IsBlocked(int $from, int $to): bool {
+        if ($from === $to) return false;
+        $h = (int)date('G');
+        return $from < $to ? ($h >= $from && $h < $to) : ($h >= $from || $h < $to);
     }
 }
 ?>

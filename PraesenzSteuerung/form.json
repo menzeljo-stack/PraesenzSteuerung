@@ -30,7 +30,7 @@
         {
             "type": "List",
             "name": "Targets",
-            "caption": "Ziel-Geräte (Status-Variablen, Bool)",
+            "caption": "Ziel-Geräte (Status-Variablen, Bool) – Sperrzeit: ab = bis bedeutet keine Sperre",
             "add": true,
             "delete": true,
             "columns": [
@@ -50,6 +50,30 @@
                     "add": 0,
                     "edit": {
                         "type": "SelectVariable"
+                    }
+                },
+                {
+                    "caption": "Nicht einschalten ab",
+                    "name": "BlockFrom",
+                    "width": "170px",
+                    "add": 0,
+                    "edit": {
+                        "type": "NumberSpinner",
+                        "minimum": 0,
+                        "maximum": 23,
+                        "suffix": " Uhr"
+                    }
+                },
+                {
+                    "caption": "bis",
+                    "name": "BlockTo",
+                    "width": "100px",
+                    "add": 0,
+                    "edit": {
+                        "type": "NumberSpinner",
+                        "minimum": 0,
+                        "maximum": 23,
+                        "suffix": " Uhr"
                     }
                 }
             ]
