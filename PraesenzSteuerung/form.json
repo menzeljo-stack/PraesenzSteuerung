@@ -30,7 +30,7 @@
         {
             "type": "List",
             "name": "Targets",
-            "caption": "Ziel-Geräte (Status-Variablen, Bool) – Sperrzeit: ab = bis bedeutet keine Sperre",
+            "caption": "Ziel-Geräte (Status-Variablen, Bool) – Sperrzeit: ab = bis bedeutet keine Sperre. „Nur mitschalten“ für Geräte, die auch von anderen Instanzen geschaltet werden (keine Hand-Erkennung).",
             "add": true,
             "delete": true,
             "columns": [
@@ -74,6 +74,15 @@
                         "minimum": 0,
                         "maximum": 23,
                         "suffix": " Uhr"
+                    }
+                },
+                {
+                    "caption": "Nur mitschalten",
+                    "name": "NoOverride",
+                    "width": "140px",
+                    "add": false,
+                    "edit": {
+                        "type": "CheckBox"
                     }
                 }
             ]

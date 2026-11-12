@@ -42,6 +42,9 @@ class PraesenzSteuerung extends IPSModule {
                 }
             }
         }
+
+        // Nach Konfigurationsänderung einen evtl. hängenden Handbetrieb zurücksetzen
+        $this->SetBuffer("ManualOverride", "NONE");
     }
 
     public function MessageSink($TimeStamp, $SenderID, $Message, $Data) {
@@ -67,6 +70,10 @@ class PraesenzSteuerung extends IPSModule {
         if (is_array($targets)) {
             foreach ($targets as $target) {
                 if ($target['VariableID'] == $SenderID) {
+                    // Geteilte Geräte (z. B. von mehreren Präsenz-Instanzen geschaltet): Änderungen nicht als Handbedienung werten
+                    if (!empty($target['NoOverride'])) {
+                        return;
+                    }
                     $isTarget = true;
                     break;
                 }
@@ -184,11 +191,30 @@ class PraesenzSteuerung extends IPSModule {
                     if ($state && $this->IsBlocked((int)($target['BlockFrom'] ?? 0), (int)($target['BlockTo'] ?? 0))) {
                         continue;
                     }
+                    // Geteiltes Gerät nicht ausschalten, solange eine andere Präsenz-Instanz mit diesem Gerät noch Anwesenheit hat
+                    if (!$state && !empty($target['NoOverride']) && $this->UsedByOtherActiveInstance((int)$target['VariableID'])) {
+                        continue;
+                    }
                     @RequestAction($target['VariableID'], $state);
                 }
             }
         }
     }
+    /** true, wenn eine andere Instanz dieses Moduls das Gerät ebenfalls schaltet und dort gerade Präsenz erkannt wird */
+    private function UsedByOtherActiveInstance(int $varID): bool {
+        $myModule = IPS_GetInstance($this->InstanceID)['ModuleInfo']['ModuleID'];
+        foreach (IPS_GetInstanceListByModuleID($myModule) as $id) {
+            if ($id == $this->InstanceID) continue;
+            $cfg = json_decode(IPS_GetConfiguration($id), true);
+            $tg = json_decode($cfg['Targets'] ?? '[]', true) ?: [];
+            if (!in_array($varID, array_map('intval', array_column($tg, 'VariableID')))) continue;
+            foreach (json_decode($cfg['PresenceSensors'] ?? '[]', true) ?: [] as $s) {
+                if (IPS_VariableExists($s['VariableID']) && GetValue($s['VariableID'])) return true;
+            }
+        }
+        return false;
+    }
+
     /** true, wenn die aktuelle Uhrzeit im Sperrfenster liegt (von == bis bedeutet keine Sperre, über Mitternacht möglich) */
     private function IsBlocked(int $from, int $to): bool {
         if ($from === $to) return false;
